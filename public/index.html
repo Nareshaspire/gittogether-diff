@@ -1,0 +1,1017 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitTogether — AI Visual Diff, Breaking Changes & Release Notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #0a0d14;
+    --bg-surface: #111726;
+    --bg-surface-elevated: #162035;
+    --bg-input: #0e1422;
+    --border-subtle: #202b40;
+    --border-hover: #374663;
+    --border-accent: rgba(99, 102, 241, 0.4);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-primary: #6366f1;
+    --accent-hover: #4f46e5;
+    --accent-glow: rgba(99, 102, 241, 0.25);
+    --add-bg: rgba(16, 185, 129, 0.12);
+    --add-border: rgba(16, 185, 129, 0.3);
+    --add-text: #34d399;
+    --del-bg: rgba(239, 68, 68, 0.12);
+    --del-border: rgba(239, 68, 68, 0.3);
+    --del-text: #f87171;
+    --amber: #f59e0b;
+    --amber-bg: rgba(245, 158, 11, 0.12);
+    --sky: #38bdf8;
+    --sky-bg: rgba(56, 189, 248, 0.12);
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.1) 0%, var(--bg-base) 65%), var(--bg-base);
+    color: var(--text-primary);
+    font: 14px/1.6 var(--font-sans);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+  }
+
+  /* Header */
+  header {
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 22px;
+  }
+  .brand-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 10px;
+  }
+  .logo-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px var(--accent-glow);
+  }
+  .logo-icon svg { width: 22px; height: 22px; fill: #ffffff; }
+  h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, #ffffff 30%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin: 0;
+    max-width: 720px;
+  }
+  .status-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+  }
+  .dot.amber {
+    background: var(--amber);
+    box-shadow: 0 0 8px var(--amber);
+  }
+
+  /* Toolbar */
+  .toolbar {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .sample-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .toolbar-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-right: 4px;
+  }
+  .btn-sample {
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-sample:hover {
+    background: #1e2b45;
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+  }
+  .btn-sample.active {
+    border-color: var(--accent-primary);
+    color: #ffffff;
+    background: rgba(99, 102, 241, 0.15);
+  }
+
+  .action-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  button {
+    font-family: var(--font-sans);
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-surface-elevated);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  button:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    background: #1e2b45;
+  }
+  button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  button.primary {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    border-color: #6366f1;
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 4px 14px var(--accent-glow);
+  }
+  button.primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35);
+    transform: translateY(-1px);
+  }
+
+  /* Input Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 820px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  .pane-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+  }
+  .pane-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .pane-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pane-tag {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+  }
+  .tag-a { background: var(--del-bg); color: var(--del-text); border: 1px solid var(--del-border); }
+  .tag-b { background: var(--add-bg); color: var(--add-text); border: 1px solid var(--add-border); }
+  .pane-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  textarea {
+    width: 100%;
+    height: 250px;
+    background: var(--bg-input);
+    color: #e2e8f0;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 12px;
+    font: 13px/1.5 var(--font-mono);
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+  textarea:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+  }
+
+  /* Banners & Alerts */
+  .banner-demo {
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #fbbf24;
+    font-size: 13px;
+  }
+  .banner-demo svg { width: 18px; height: 18px; flex-shrink: 0; fill: currentColor; }
+  .banner-error {
+    background: var(--del-bg);
+    border: 1px solid var(--del-border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    color: var(--del-text);
+    font-size: 13px;
+    white-space: pre-wrap;
+  }
+
+  /* Results Section */
+  .results-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    animation: fadeIn 0.25s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* SemVer Recommendation Banner */
+  .semver-card {
+    background: linear-gradient(135deg, rgba(22, 32, 53, 0.9) 0%, rgba(17, 23, 38, 0.9) 100%);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 18px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .semver-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .semver-badge {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: 0.04em;
+  }
+  .semver-badge.major {
+    background: var(--del-bg);
+    border: 1px solid var(--del-border);
+    color: #fca5a5;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+  }
+  .semver-badge.minor {
+    background: var(--amber-bg);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #fcd34d;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+  }
+  .semver-badge.patch {
+    background: var(--add-bg);
+    border: 1px solid var(--add-border);
+    color: #6ee7b7;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
+  }
+  .semver-desc {
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-body {
+    color: #e2e8f0;
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0;
+    white-space: pre-wrap;
+  }
+
+  /* Diff View */
+  .diff-stats {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+  }
+  .diff-add-count { color: var(--add-text); }
+  .diff-del-count { color: var(--del-text); }
+  .diff-box {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    background: var(--bg-input);
+    overflow: auto;
+    max-height: 380px;
+  }
+  .diff-row {
+    display: flex;
+    padding: 0 8px;
+    white-space: pre;
+  }
+  .diff-row.add { background: var(--add-bg); color: var(--add-text); border-left: 3px solid #10b981; }
+  .diff-row.del { background: var(--del-bg); color: var(--del-text); border-left: 3px solid #ef4444; }
+  .diff-row.same { color: var(--text-muted); border-left: 3px solid transparent; }
+  .diff-line-no {
+    width: 42px;
+    flex-shrink: 0;
+    user-select: none;
+    color: #475569;
+    text-align: right;
+    padding-right: 12px;
+    font-size: 12px;
+  }
+  .diff-marker {
+    width: 18px;
+    flex-shrink: 0;
+    user-select: none;
+    font-weight: 600;
+  }
+  .diff-content {
+    flex-grow: 1;
+    overflow-x: auto;
+  }
+
+  /* Breaking Changes */
+  .bc-card {
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    transition: border-color 0.15s ease;
+  }
+  .bc-card:hover { border-color: var(--border-hover); }
+  .bc-card.high { border-left: 3px solid #ef4444; }
+  .bc-card.medium { border-left: 3px solid #f59e0b; }
+  .bc-card.low { border-left: 3px solid #38bdf8; }
+  .bc-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .bc-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+  .bc-detail {
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .sev-pill {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+  }
+  .sev-pill.high { background: var(--del-bg); color: var(--del-text); border: 1px solid var(--del-border); }
+  .sev-pill.medium { background: var(--amber-bg); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+  .sev-pill.low { background: var(--sky-bg); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+
+  .empty-state {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
+  /* Release Notes */
+  pre.code-block {
+    margin: 0;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 16px;
+    color: #e2e8f0;
+    font: 13px/1.5 var(--font-mono);
+    white-space: pre-wrap;
+    max-height: 360px;
+    overflow: auto;
+  }
+
+  /* Toast Notification */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #1e293b;
+    border: 1px solid var(--accent-primary);
+    color: #ffffff;
+    padding: 12px 18px;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(12px);
+    transition: all 0.2s ease;
+    z-index: 1000;
+  }
+  .toast.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="brand-row">
+      <div class="logo-group">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24"><path d="M17 12a3 3 0 0 0-2.83 2H9.83A3 3 0 0 0 7 12a3 3 0 0 0-2.83 2H3a1 1 0 1 0 0 2h1.17A3 3 0 0 0 7 18a3 3 0 0 0 2.83-2h4.34A3 3 0 0 0 17 18a3 3 0 0 0 3-3 3 3 0 0 0-3-3zm-10 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm10 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2zM6 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm11 0a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+        </div>
+        <div>
+          <h1>GitTogether</h1>
+          <p class="subtitle">AI-Powered Visual Diff, Architectural Impact, Breaking Change Detector & Release Notes</p>
+        </div>
+      </div>
+      <div class="status-badges">
+        <span id="demoBadge" class="status-pill"><span class="dot amber"></span>Demo Mode</span>
+        <span class="status-pill"><span class="dot"></span>Claude 3.5 Sonnet Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Toolbar with curated scenarios -->
+  <div class="toolbar">
+    <div class="sample-group">
+      <span class="toolbar-label">Load Scenario:</span>
+      <button id="btnSample1" class="btn-sample active">🚀 1. API Refactor (Breaking)</button>
+      <button id="btnSample2" class="btn-sample">⚡ 2. Redis Cache (Non-Breaking)</button>
+      <button id="btnSample3" class="btn-sample">🛡️ 3. Security Sanitizer (Patch)</button>
+    </div>
+    <div class="action-group">
+      <button id="btnSwap" title="Swap Version A and Version B">⇄ Swap</button>
+      <button id="btnClear">Clear</button>
+      <button id="btnAnalyze" class="primary">Analyze Changes</button>
+    </div>
+  </div>
+
+  <div id="errorBanner" class="banner-error hidden"></div>
+  <div id="demoNotice" class="banner-demo hidden">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+    <span><strong>Demo Mode Active:</strong> Analysis is running with local pre-computed models so you can test end-to-end without an API key. Add <code>ANTHROPIC_API_KEY</code> to <code>.env</code> to call live models.</span>
+  </div>
+
+  <!-- Input Panes -->
+  <div class="grid">
+    <div class="pane-card">
+      <div class="pane-header">
+        <div class="pane-title">
+          <span class="pane-tag tag-a">Before</span>
+          <span>Version A (Target / Base)</span>
+        </div>
+        <div id="metaA" class="pane-meta">0 lines • 0 chars</div>
+      </div>
+      <textarea id="inputA" spellcheck="false" placeholder="Paste earlier code version or base git commit..."></textarea>
+    </div>
+
+    <div class="pane-card">
+      <div class="pane-header">
+        <div class="pane-title">
+          <span class="pane-tag tag-b">After</span>
+          <span>Version B (Incoming / Head)</span>
+        </div>
+        <div id="metaB" class="pane-meta">0 lines • 0 chars</div>
+      </div>
+      <textarea id="inputB" spellcheck="false" placeholder="Paste updated code version or incoming commit..."></textarea>
+    </div>
+  </div>
+
+  <!-- Results Dashboard -->
+  <div id="resultsArea" class="results-wrapper hidden">
+
+    <!-- SemVer Recommendation Banner -->
+    <div id="semverCard" class="semver-card">
+      <div class="semver-left">
+        <div id="semverBadge" class="semver-badge major">Major Bump</div>
+        <div id="semverText" class="semver-desc">Breaking changes detected in public function signatures.</div>
+      </div>
+      <div class="diff-stats">
+        <span class="diff-add-count" id="statAdds">+0 additions</span>
+        <span class="diff-del-count" id="statDels">-0 deletions</span>
+      </div>
+    </div>
+
+    <!-- Visual Diff -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+          Visual Line Diff
+        </h2>
+      </div>
+      <div id="diffBox" class="diff-box"></div>
+    </div>
+
+    <!-- Analysis Breakdown -->
+    <div id="analysisArea" class="results-wrapper hidden">
+      <!-- Summary -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            Plain-English Summary
+          </h2>
+        </div>
+        <p id="summaryText" class="card-body"></p>
+      </div>
+
+      <!-- Architectural Impact -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            Architectural Impact & Blast Radius
+          </h2>
+        </div>
+        <p id="impactText" class="card-body"></p>
+      </div>
+
+      <!-- Potential Breaking Changes -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Potential Breaking Changes
+          </h2>
+        </div>
+        <div id="breakingList"></div>
+      </div>
+
+      <!-- Release Notes Markdown -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Release Notes (Markdown)
+          </h2>
+          <div style="display: flex; gap: 8px;">
+            <button id="btnDownload">Download .md</button>
+            <button id="btnCopy" class="primary">Copy Markdown</button>
+          </div>
+        </div>
+        <pre id="notesBlock" class="code-block"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast">Action completed successfully</div>
+
+<script>
+// Built-in curated scenarios for demo
+const SAMPLES = {
+  1: {
+    name: 'API Refactor (Breaking)',
+    a: `function createUser(name, email) {
+  if (!email.includes('@')) {
+    return null;
+  }
+  return db.insert('users', { name, email });
+}`,
+    b: `function validateEmail(email) {
+  if (!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) {
+    throw new ValidationError('Invalid email: ' + email);
+  }
+}
+
+function createUser({ name, email, role = 'member' }) {
+  validateEmail(email);
+  return db.insert('users', { name, email, role });
+}`
+  },
+  2: {
+    name: 'Redis Cache Layer (Non-Breaking)',
+    a: `async function getUserProfile(userId) {
+  const user = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
+  if (!user) throw new NotFoundError('User not found');
+  return user;
+}`,
+    b: `import { cache } from './redisClient';
+
+async function getUserProfile(userId) {
+  const cached = await cache.get(\`user:\${userId}\`);
+  if (cached) return JSON.parse(cached);
+
+  const user = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
+  if (!user) throw new NotFoundError('User not found');
+
+  await cache.set(\`user:\${userId}\`, JSON.stringify(user), { ttlSeconds: 300 });
+  return user;
+}`
+  },
+  3: {
+    name: 'Security Sanitization (Patch)',
+    a: `function renderMarkdown(content) {
+  return markdownParser.parse(content);
+}`,
+    b: `import DOMPurify from 'dompurify';
+
+function renderMarkdown(content) {
+  const rawHtml = markdownParser.parse(content);
+  return DOMPurify.sanitize(rawHtml, { ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'code', 'pre'] });
+}`
+  }
+};
+
+const $ = (id) => document.getElementById(id);
+
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function updateMeta() {
+  const a = $('inputA').value, b = $('inputB').value;
+  $('metaA').textContent = `${a ? a.split('\n').length : 0} lines • ${a.length} chars`;
+  $('metaB').textContent = `${b ? b.split('\n').length : 0} lines • ${b.length} chars`;
+}
+
+function loadSample(id) {
+  const s = SAMPLES[id];
+  if (!s) return;
+  $('inputA').value = s.a;
+  $('inputB').value = s.b;
+  updateMeta();
+  $('btnSample1').classList.toggle('active', id === 1);
+  $('btnSample2').classList.toggle('active', id === 2);
+  $('btnSample3').classList.toggle('active', id === 3);
+  showError('');
+  showToast(`Loaded ${s.name}`);
+}
+
+function showError(msg) {
+  const e = $('errorBanner');
+  e.textContent = msg || '';
+  e.classList.toggle('hidden', !msg);
+}
+
+// LCS Line Diff with line numbers and stats
+function computeDiff(aText, bText) {
+  const a = aText.split('\n'), b = bText.split('\n');
+  if (a.length > 2500 || b.length > 2500) return null;
+  const n = a.length, m = b.length;
+  const t = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      t[i][j] = a[i] === b[j] ? t[i + 1][j + 1] + 1 : Math.max(t[i + 1][j], t[i][j + 1]);
+    }
+  }
+
+  const rows = [];
+  let i = 0, j = 0;
+  let lineA = 1, lineB = 1;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) {
+      rows.push({ type: 'same', text: a[i], lineA: lineA++, lineB: lineB++ });
+      i++; j++;
+    } else if (t[i + 1][j] >= t[i][j + 1]) {
+      rows.push({ type: 'del', text: a[i], lineA: lineA++, lineB: '' });
+      i++;
+    } else {
+      rows.push({ type: 'add', text: b[j], lineA: '', lineB: lineB++ });
+      j++;
+    }
+  }
+  while (i < n) rows.push({ type: 'del', text: a[i++], lineA: lineA++, lineB: '' });
+  while (j < m) rows.push({ type: 'add', text: b[j++], lineA: '', lineB: lineB++ });
+  return rows;
+}
+
+function renderDiff(aText, bText) {
+  const box = $('diffBox');
+  box.textContent = '';
+  const rows = computeDiff(aText, bText);
+  if (!rows) {
+    box.innerHTML = '<div class="empty-state">Inputs are too large to render visual diff in browser.</div>';
+    return;
+  }
+
+  let adds = 0, dels = 0;
+  const frag = document.createDocumentFragment();
+  for (const r of rows) {
+    if (r.type === 'add') adds++;
+    if (r.type === 'del') dels++;
+    const row = document.createElement('div');
+    row.className = `diff-row ${r.type}`;
+
+    const numCol = document.createElement('span');
+    numCol.className = 'diff-line-no';
+    numCol.textContent = r.type === 'del' ? r.lineA : (r.type === 'add' ? r.lineB : r.lineB);
+
+    const markCol = document.createElement('span');
+    markCol.className = 'diff-marker';
+    markCol.textContent = r.type === 'add' ? '+' : (r.type === 'del' ? '-' : ' ');
+
+    const codeCol = document.createElement('span');
+    codeCol.className = 'diff-content';
+    codeCol.textContent = r.text;
+
+    row.append(numCol, markCol, codeCol);
+    frag.appendChild(row);
+  }
+  box.appendChild(frag);
+
+  $('statAdds').textContent = `+${adds} additions`;
+  $('statDels').textContent = `-${dels} deletions`;
+}
+
+function renderBreaking(list) {
+  const box = $('breakingList');
+  box.textContent = '';
+  if (!list || !list.length) {
+    box.innerHTML = '<div class="empty-state">✓ No breaking changes detected in this change.</div>';
+    return;
+  }
+  for (const item of list) {
+    const card = document.createElement('div');
+    card.className = `bc-card ${item.severity}`;
+    
+    const head = document.createElement('div');
+    head.className = 'bc-header';
+
+    const pill = document.createElement('span');
+    pill.className = `sev-pill ${item.severity}`;
+    pill.textContent = item.severity;
+
+    const title = document.createElement('span');
+    title.className = 'bc-title';
+    title.textContent = item.title;
+
+    head.append(pill, title);
+
+    const detail = document.createElement('div');
+    detail.className = 'bc-detail';
+    detail.textContent = item.detail;
+
+    card.append(head, detail);
+    box.appendChild(card);
+  }
+}
+
+function updateSemVerUI(level, breakingCount) {
+  const badge = $('semverBadge');
+  const text = $('semverText');
+  badge.className = `semver-badge ${level}`;
+
+  if (level === 'major') {
+    badge.textContent = 'Major Bump (v2.0.0)';
+    text.textContent = `${breakingCount} potential breaking change${breakingCount > 1 ? 's' : ''} detected. Callers may require migration.`;
+  } else if (level === 'minor') {
+    badge.textContent = 'Minor Bump (v1.1.0)';
+    text.textContent = 'Backward-compatible additions or performance enhancements detected.';
+  } else {
+    badge.textContent = 'Patch Bump (v1.0.1)';
+    text.textContent = 'Backward-compatible bug fixes or security patches detected.';
+  }
+}
+
+// Event Listeners
+$('inputA').addEventListener('input', updateMeta);
+$('inputB').addEventListener('input', updateMeta);
+
+$('btnSample1').onclick = () => loadSample(1);
+$('btnSample2').onclick = () => loadSample(2);
+$('btnSample3').onclick = () => loadSample(3);
+
+$('btnSwap').onclick = () => {
+  const temp = $('inputA').value;
+  $('inputA').value = $('inputB').value;
+  $('inputB').value = temp;
+  updateMeta();
+  showToast('Swapped input panes');
+};
+
+$('btnClear').onclick = () => {
+  $('inputA').value = '';
+  $('inputB').value = '';
+  updateMeta();
+  $('resultsArea').classList.add('hidden');
+  $('demoNotice').classList.add('hidden');
+  showError('');
+  showToast('Cleared inputs');
+};
+
+$('btnCopy').onclick = async () => {
+  const notes = $('notesBlock').textContent;
+  try {
+    await navigator.clipboard.writeText(notes);
+    $('btnCopy').textContent = 'Copied! ✓';
+    showToast('Release notes copied to clipboard');
+  } catch (_) {
+    $('btnCopy').textContent = 'Copy failed';
+  }
+  setTimeout(() => ($('btnCopy').textContent = 'Copy Markdown'), 2000);
+};
+
+$('btnDownload').onclick = () => {
+  const notes = $('notesBlock').textContent;
+  const blob = new Blob([notes], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'RELEASE_NOTES.md';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Downloaded RELEASE_NOTES.md');
+};
+
+$('btnAnalyze').onclick = async () => {
+  const a = $('inputA').value, b = $('inputB').value;
+  showError('');
+  if (!a.trim() || !b.trim()) {
+    showError('Please provide both Version A (before) and Version B (after) to analyze.');
+    return;
+  }
+
+  $('resultsArea').classList.remove('hidden');
+  renderDiff(a, b);
+  $('analysisArea').classList.add('hidden');
+
+  const btn = $('btnAnalyze');
+  btn.disabled = true;
+  btn.textContent = 'Analyzing with Claude...';
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ a, b }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Server error occurred');
+
+    $('summaryText').textContent = data.summary;
+    $('impactText').textContent = data.architectural_impact;
+    renderBreaking(data.breaking_changes);
+    $('notesBlock').textContent = data.release_notes_markdown;
+
+    const semver = data.semver_recommendation || (data.breaking_changes && data.breaking_changes.some(x => x.severity === 'high') ? 'major' : (data.breaking_changes && data.breaking_changes.length ? 'minor' : 'patch'));
+    updateSemVerUI(semver, (data.breaking_changes || []).length);
+
+    $('analysisArea').classList.remove('hidden');
+    $('demoNotice').classList.toggle('hidden', !data.demo);
+    showToast('Analysis completed successfully!');
+  } catch (err) {
+    showError('Analysis failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Analyze Changes';
+  }
+};
+
+// Initial health check & sample load
+fetch('/api/health')
+  .then((r) => r.json())
+  .then((h) => {
+    $('demoBadge').classList.toggle('hidden', !h.demo);
+    $('demoNotice').classList.toggle('hidden', !h.demo);
+  })
+  .catch(() => {});
+
+// Load Sample 1 by default
+loadSample(1);
+</script>
+</body>
+</html>
