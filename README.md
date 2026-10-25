@@ -50,15 +50,6 @@ In accordance with the Devpost Build With AI Basics specification:
 - [spec.md](spec.md) — Technical architecture, API contracts, prompt design, line diff algorithm, and smoke tests.
 
 ---
-
-## Demo Script (under 2 minutes)
-
-1. **(0:00 - 0:20)** State the problem: Code reviews and changelog writing take time, and subtle breaking changes get missed under pressure.
-2. **(0:20 - 0:45)** Open `http://localhost:3000`, select **Scenario 1**, and point out the side-by-side inputs and visual diff.
-3. **(0:45 - 1:15)** Click **Analyze Changes**. Walk through the **Major Bump (v2.0.0)** badge, the Plain-English Summary, and the flagged Breaking Change (`createUser` signature change).
-4. **(1:15 - 1:40)** Click **Copy Markdown** on the release notes block and show the toast confirmation. Switch to **Scenario 2** to demonstrate a non-breaking **Minor Bump**.
-5. **(1:40 - 2:00)** Conclude: Built using spec-driven development with AI planning skills. Next steps: GitHub Action integration and PR webhook bots.
-
 ---
 
 ## License
