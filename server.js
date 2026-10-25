@@ -184,6 +184,262 @@ async function analyze(a, b) {
   }
 }
 
+async function analyzeStream(a, b, res) {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+  });
+
+  const sendEvent = (event, data) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  if (isDemo()) {
+    const demo = getDemoResult(a, b);
+    sendEvent('status', { status: 'generating', demo: true });
+
+    // Stream out chunks progressively for an authentic live streaming experience
+    const streamTokens = [];
+    streamTokens.push("### Analyzing code change...\n");
+    streamTokens.push(`- Recommended Version Bump: **${demo.semver_recommendation.toUpperCase()}**\n\n`);
+    streamTokens.push(`**Summary**: ${demo.summary}\n\n`);
+    streamTokens.push(`**Architectural Impact**: ${demo.architectural_impact}\n\n`);
+    if (demo.breaking_changes && demo.breaking_changes.length > 0) {
+      streamTokens.push(`**Flagged Breaking Changes (${demo.breaking_changes.length})**:\n`);
+      for (const bc of demo.breaking_changes) {
+        streamTokens.push(`- [${bc.severity.toUpperCase()}] ${bc.title}: ${bc.detail}\n`);
+      }
+      streamTokens.push('\n');
+    }
+    streamTokens.push(`**Generated Release Notes**:\n${demo.release_notes_markdown}`);
+
+    for (const token of streamTokens) {
+      const words = token.split(/(?<=\s+)/);
+      for (const w of words) {
+        sendEvent('token', { text: w });
+        await new Promise((r) => setTimeout(r, 16));
+      }
+    }
+
+    sendEvent('complete', demo);
+    res.end();
+    return;
+  }
+
+  // Live Claude API with streaming
+  try {
+    sendEvent('status', { status: 'connecting', model: MODEL });
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 2000,
+        temperature: 0.2,
+        stream: true,
+        system: SYSTEM_PROMPT,
+        messages: [
+          { role: 'user', content: `<version_a>\n${a}\n</version_a>\n\n<version_b>\n${b}\n</version_b>` },
+        ],
+      }),
+    });
+
+    if (!claudeRes.ok) {
+      const errData = await claudeRes.json().catch(() => ({}));
+      const msg = (errData.error && errData.error.message) || `Claude API returned ${claudeRes.status}`;
+      sendEvent('error', { error: msg });
+      res.end();
+      return;
+    }
+
+    sendEvent('status', { status: 'generating' });
+    let accumulatedText = '';
+    const reader = claudeRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // save trailing partial line
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const raw = line.slice(6).trim();
+          if (raw === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              const text = parsed.delta.text;
+              accumulatedText += text;
+              sendEvent('token', { text });
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    try {
+      const finalJson = normalize(extractJson(accumulatedText));
+      sendEvent('complete', finalJson);
+    } catch (e) {
+      sendEvent('error', { error: 'Could not parse model response as JSON.', raw: accumulatedText });
+    }
+    res.end();
+  } catch (err) {
+    sendEvent('error', { error: err.message || 'Stream processing failed' });
+    res.end();
+  }
+}
+
+function parseGitHubUrl(urlStr) {
+  try {
+    const parsed = new URL(urlStr.trim());
+    if (!parsed.hostname.includes('github.com')) return null;
+    const parts = parsed.pathname.replace(/^\/|\/$/g, '').split('/');
+    if (parts.length >= 4 && parts[2] === 'pull') {
+      return { type: 'pull', owner: parts[0], repo: parts[1], number: parts[3] };
+    }
+    if (parts.length >= 4 && parts[2] === 'commit') {
+      return { type: 'commit', owner: parts[0], repo: parts[1], sha: parts[3] };
+    }
+    if (parts.length >= 4 && parts[2] === 'compare') {
+      return { type: 'compare', owner: parts[0], repo: parts[1], range: parts[3] };
+    }
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function parseUnifiedDiff(diffText) {
+  const files = [];
+  const rawFiles = diffText.split(/^diff --git /m);
+  for (const raw of rawFiles) {
+    if (!raw.trim()) continue;
+    const lines = raw.split('\n');
+    const header = lines[0] || '';
+    const m = header.match(/a\/(.+?)\s+b\/(.+)/);
+    let filename = m ? m[2] : '';
+    if (!filename) {
+      const plusLine = lines.find((l) => l.startsWith('+++ b/'));
+      if (plusLine) filename = plusLine.replace('+++ b/', '').trim();
+    }
+    if (!filename) {
+      const minusLine = lines.find((l) => l.startsWith('--- a/'));
+      if (minusLine) filename = minusLine.replace('--- a/', '').trim();
+    }
+    filename = filename || 'changed_file.txt';
+
+    let beforeLines = [];
+    let afterLines = [];
+    let inHunk = false;
+    let adds = 0;
+    let dels = 0;
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.startsWith('@@')) {
+        inHunk = true;
+        continue;
+      }
+      if (!inHunk) continue;
+
+      if (line.startsWith('-')) {
+        beforeLines.push(line.slice(1));
+        dels++;
+      } else if (line.startsWith('+')) {
+        afterLines.push(line.slice(1));
+        adds++;
+      } else if (line.startsWith(' ')) {
+        beforeLines.push(line.slice(1));
+        afterLines.push(line.slice(1));
+      } else if (line.startsWith('\\ No newline')) {
+        continue;
+      }
+    }
+
+    files.push({
+      filename,
+      additions: adds,
+      deletions: dels,
+      patch: 'diff --git ' + raw.trim(),
+      before: beforeLines.join('\n'),
+      after: afterLines.join('\n'),
+    });
+  }
+  return files;
+}
+
+async function fetchGitHubDiff(info) {
+  const headers = {
+    'User-Agent': 'GitTogether-Tool',
+    'Accept': 'text/plain, application/vnd.github.v3.diff, */*',
+  };
+  if (process.env.GITHUB_TOKEN) {
+    headers['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
+
+  let diffUrl = '';
+  let metaUrl = '';
+  let title = '';
+
+  if (info.type === 'pull') {
+    diffUrl = `https://github.com/${info.owner}/${info.repo}/pull/${info.number}.diff`;
+    metaUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/pulls/${info.number}`;
+    title = `PR #${info.number} (${info.owner}/${info.repo})`;
+  } else if (info.type === 'commit') {
+    diffUrl = `https://github.com/${info.owner}/${info.repo}/commit/${info.sha}.diff`;
+    metaUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/commits/${info.sha}`;
+    title = `Commit ${info.sha.slice(0, 7)} (${info.owner}/${info.repo})`;
+  } else if (info.type === 'compare') {
+    diffUrl = `https://github.com/${info.owner}/${info.repo}/compare/${info.range}.diff`;
+    title = `Compare ${info.range} (${info.owner}/${info.repo})`;
+  }
+
+  if (metaUrl) {
+    try {
+      const metaRes = await fetch(metaUrl, { headers });
+      if (metaRes.ok) {
+        const meta = await metaRes.json();
+        if (info.type === 'pull' && meta.title) {
+          title = `#${info.number}: ${meta.title}`;
+        } else if (info.type === 'commit' && meta.commit?.message) {
+          title = meta.commit.message.split('\n')[0];
+        }
+      }
+    } catch (_) {}
+  }
+
+  const diffRes = await fetch(diffUrl, { headers, redirect: 'follow' });
+  if (!diffRes.ok) {
+    throw new Error(`Failed to fetch diff from GitHub (${diffRes.status} ${diffRes.statusText})`);
+  }
+  const diffText = await diffRes.text();
+  if (!diffText.trim() || diffText.includes('<!DOCTYPE html>') || diffText === 'Not Found') {
+    throw new Error('No valid git diff found for the specified GitHub URL.');
+  }
+
+  const files = parseUnifiedDiff(diffText);
+  return {
+    title,
+    owner: info.owner,
+    repo: info.repo,
+    type: info.type,
+    diffUrl,
+    files,
+    rawDiff: diffText,
+  };
+}
+
 function send(res, status, obj) {
   res.writeHead(status, { 'content-type': 'application/json' });
   res.end(JSON.stringify(obj));
@@ -206,20 +462,55 @@ function readBody(req) {
 
 const server = http.createServer(async (req, res) => {
   try {
-    if (req.method === 'GET' && req.url === '/api/health') return send(res, 200, { ok: true, demo: isDemo() });
+    const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost:3000'}`);
 
-    if (req.method === 'POST' && req.url === '/api/analyze') {
+    if (req.method === 'GET' && reqUrl.pathname === '/api/health') {
+      return send(res, 200, { ok: true, demo: isDemo() });
+    }
+
+    if (req.method === 'POST' && reqUrl.pathname === '/api/github') {
+      let payload;
+      try {
+        payload = JSON.parse(await readBody(req));
+      } catch (e) {
+        return send(res, 400, { error: 'Invalid JSON body' });
+      }
+      const { url } = payload || {};
+      if (!url || typeof url !== 'string') {
+        return send(res, 400, { error: 'A valid GitHub PR, commit, or compare URL is required.' });
+      }
+      const info = parseGitHubUrl(url);
+      if (!info) {
+        return send(res, 400, { error: 'Could not parse GitHub URL. Format: https://github.com/:owner/:repo/pull/:number or /commit/:sha' });
+      }
+      try {
+        const result = await fetchGitHubDiff(info);
+        return send(res, 200, result);
+      } catch (e) {
+        return send(res, 502, { error: e.message });
+      }
+    }
+
+    if (req.method === 'POST' && reqUrl.pathname === '/api/analyze') {
       let payload;
       try {
         payload = JSON.parse(await readBody(req));
       } catch (e) {
         return send(res, e.status || 400, { error: e.status ? e.message : 'Invalid JSON body' });
       }
-      const { a, b } = payload || {};
-      if (typeof a !== 'string' || typeof b !== 'string' || !a.trim() || !b.trim())
+      const { a, b, stream } = payload || {};
+      if (typeof a !== 'string' || typeof b !== 'string' || !a.trim() || !b.trim()) {
         return send(res, 400, { error: 'Both Version A and Version B are required.' });
-      if (a.length > MAX_CHARS || b.length > MAX_CHARS)
+      }
+      if (a.length > MAX_CHARS || b.length > MAX_CHARS) {
         return send(res, 400, { error: `Each input must be at most ${MAX_CHARS} characters.` });
+      }
+
+      const wantsStream = stream === true || reqUrl.searchParams.get('stream') === 'true' || req.headers.accept?.includes('text/event-stream');
+      if (wantsStream) {
+        return analyzeStream(a, b, res);
+      }
+
       try {
         return send(res, 200, await analyze(a, b));
       } catch (e) {
@@ -227,7 +518,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    if ((req.method === 'GET' || req.method === 'HEAD') && (req.url === '/' || req.url === '/index.html')) {
+    if ((req.method === 'GET' || req.method === 'HEAD') && (reqUrl.pathname === '/' || reqUrl.pathname === '/index.html')) {
       const html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'));
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(req.method === 'HEAD' ? undefined : html);
