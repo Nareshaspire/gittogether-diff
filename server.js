@@ -399,14 +399,21 @@ async function fetchGitHubDiff(info) {
   if (info.type === 'repo') {
     let latestSha = null;
     let commitMsg = '';
+    let apiStatus = null;
+    let apiErrorMsg = '';
+
     try {
       const commitRes = await fetch(`https://api.github.com/repos/${info.owner}/${info.repo}/commits?per_page=1`, { headers });
+      apiStatus = commitRes.status;
       if (commitRes.ok) {
         const commits = await commitRes.json();
         if (Array.isArray(commits) && commits.length > 0) {
           latestSha = commits[0].sha;
           commitMsg = commits[0].commit?.message?.split('\n')[0] || '';
         }
+      } else {
+        const errJson = await commitRes.json().catch(() => ({}));
+        apiErrorMsg = errJson.message || '';
       }
     } catch (_) {}
 
@@ -424,7 +431,13 @@ async function fetchGitHubDiff(info) {
     }
 
     if (!latestSha) {
-      throw new Error(`Could not find any commits for repository ${info.owner}/${info.repo}. Ensure the repository is public or has commits.`);
+      if (apiStatus === 404) {
+        throw new Error(`Repository "${info.owner}/${info.repo}" was not found (404). If it is a private repository, configure GITHUB_TOKEN in your environment or set the repo to public.`);
+      }
+      if (apiStatus === 403 && apiErrorMsg.toLowerCase().includes('rate limit')) {
+        throw new Error(`GitHub API rate limit exceeded. Please wait a moment or configure GITHUB_TOKEN.`);
+      }
+      throw new Error(`Could not access repository "${info.owner}/${info.repo}". Ensure the repository exists, is public (or GITHUB_TOKEN is set), and has commits.`);
     }
 
     diffUrl = `https://github.com/${info.owner}/${info.repo}/commit/${latestSha}.diff`;

@@ -1352,8 +1352,8 @@ async function fetchGitHub(url) {
     renderGitHubBanner(data);
     showToast(`Fetched ${data.title}`);
   } catch (err) {
-    // If GitHub API rate limits or network issues arise, offer rich fallback sample
-    showError(`GitHub Fetch: ${err.message}.`);
+    const msg = String(err.message || 'Failed to fetch GitHub diff').replace(/\.+$/, '');
+    showError(`GitHub Fetch: ${msg}.`);
   } finally {
     btn.disabled = false;
     btn.textContent = 'Fetch Diff';
