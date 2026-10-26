@@ -304,15 +304,19 @@ function parseGitHubUrl(urlStr) {
   try {
     const parsed = new URL(urlStr.trim());
     if (!parsed.hostname.includes('github.com')) return null;
-    const parts = parsed.pathname.replace(/^\/|\/$/g, '').split('/');
-    if (parts.length >= 4 && parts[2] === 'pull') {
+    const cleanPath = parsed.pathname.replace(/^\/|\/$/g, '').replace(/\.git$/i, '');
+    const parts = cleanPath.split('/');
+    if (parts.length >= 4 && (parts[2] === 'pull' || parts[2] === 'pulls')) {
       return { type: 'pull', owner: parts[0], repo: parts[1], number: parts[3] };
     }
-    if (parts.length >= 4 && parts[2] === 'commit') {
+    if (parts.length >= 4 && (parts[2] === 'commit' || parts[2] === 'commits')) {
       return { type: 'commit', owner: parts[0], repo: parts[1], sha: parts[3] };
     }
     if (parts.length >= 4 && parts[2] === 'compare') {
       return { type: 'compare', owner: parts[0], repo: parts[1], range: parts[3] };
+    }
+    if (parts.length === 2 && parts[0] && parts[1]) {
+      return { type: 'repo', owner: parts[0], repo: parts[1] };
     }
     return null;
   } catch (_) {
@@ -392,7 +396,42 @@ async function fetchGitHubDiff(info) {
   let metaUrl = '';
   let title = '';
 
-  if (info.type === 'pull') {
+  if (info.type === 'repo') {
+    let latestSha = null;
+    let commitMsg = '';
+    try {
+      const commitRes = await fetch(`https://api.github.com/repos/${info.owner}/${info.repo}/commits?per_page=1`, { headers });
+      if (commitRes.ok) {
+        const commits = await commitRes.json();
+        if (Array.isArray(commits) && commits.length > 0) {
+          latestSha = commits[0].sha;
+          commitMsg = commits[0].commit?.message?.split('\n')[0] || '';
+        }
+      }
+    } catch (_) {}
+
+    if (!latestSha) {
+      try {
+        const atomRes = await fetch(`https://github.com/${info.owner}/${info.repo}/commits.atom`, { headers });
+        if (atomRes.ok) {
+          const atomText = await atomRes.text();
+          const match = atomText.match(/commit\/([a-f0-9]{40})/);
+          if (match) {
+            latestSha = match[1];
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!latestSha) {
+      throw new Error(`Could not find any commits for repository ${info.owner}/${info.repo}. Ensure the repository is public or has commits.`);
+    }
+
+    diffUrl = `https://github.com/${info.owner}/${info.repo}/commit/${latestSha}.diff`;
+    title = commitMsg
+      ? `Latest Commit: ${commitMsg} (${latestSha.slice(0, 7)})`
+      : `Latest Commit ${latestSha.slice(0, 7)} (${info.owner}/${info.repo})`;
+  } else if (info.type === 'pull') {
     diffUrl = `https://github.com/${info.owner}/${info.repo}/pull/${info.number}.diff`;
     metaUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/pulls/${info.number}`;
     title = `PR #${info.number} (${info.owner}/${info.repo})`;
@@ -477,11 +516,11 @@ const server = http.createServer(async (req, res) => {
       }
       const { url } = payload || {};
       if (!url || typeof url !== 'string') {
-        return send(res, 400, { error: 'A valid GitHub PR, commit, or compare URL is required.' });
+        return send(res, 400, { error: 'A valid GitHub PR, commit, compare, or repo URL is required.' });
       }
       const info = parseGitHubUrl(url);
       if (!info) {
-        return send(res, 400, { error: 'Could not parse GitHub URL. Format: https://github.com/:owner/:repo/pull/:number or /commit/:sha' });
+        return send(res, 400, { error: 'Could not parse GitHub URL. Supported formats: repository URL (e.g., https://github.com/:owner/:repo), PR URL (/pull/:number), or commit URL (/commit/:sha).' });
       }
       try {
         const result = await fetchGitHubDiff(info);
